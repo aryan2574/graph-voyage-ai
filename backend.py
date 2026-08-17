@@ -7,10 +7,11 @@ load_dotenv()
 os.environ["SSL_CERT_FILE"] = certifi.where()
 os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()
 
-from typing import TypedDict, Annotated
+from typing import TypedDict, Annotated, Any
 import operator
 import uuid
 import asyncio
+import josn
 
 import psycopg
 from psycopg.rows import dict_row
@@ -22,10 +23,10 @@ from langchain_core.messages import (AnyMessage, HumanMessage, AIMessage, System
 from langchain_groq import ChatGroq
 
 # from tools.tavily_tool import tavily_search
-from tools.flight_tool import search_flights
+# from tools.flight_tool import search_flights
 
 # from mcp_client_test import tavily_mcp_search
-from mcp_client import tavily_mcp_search, extract_destination, forecast_mcp_search, weather_mcp_search
+from mcp_client import ( tavily_mcp_search, extract_destination, forecast_mcp_search, weather_mcp_search)
 
 
 def run_async(coro):
@@ -63,14 +64,88 @@ if not GROQ_API_KEY:
 
 llm = ChatGroq(model="llama-3.3-70b-versatile", api_key=GROQ_API_KEY)
 
-class TravelState(TypedDict):
+
+# State
+# class TravelState(TypedDict):
+#     messages: Annotated[list[AnyMessage], operator.add]
+#     user_query: str
+#     flight_results: str
+#     hotel_results: str
+#     itinerary: str
+#     llm_calls: int
+#     weather_results: str
+
+class TravelState(TypedDict, total=False):
     messages: Annotated[list[AnyMessage], operator.add]
     user_query: str
+
+    #Supervisor + guardrail state
+    guardrail_allowed: bool
+    guardrail_reason: str
+    selected_agents: list[str]
+    trip_constraints: dict[str, Any]
+    supervisor_reasoning: str
+
+    # Original specialist results
     flight_results: str
     hotel_results: str
-    itinerary: str
-    llm_calls: int
     weather_results: str
+    itinerary: str
+
+    # New budget + HTIL state
+    budget_results: str
+    approval_request: str
+    approved: bool
+    human_feedback: str
+    final_response: str
+
+    llm_calls: int
+
+# Shared Helpers
+KNOWN_AGENTS = {
+    "flight_agent",
+    "hotel_agent",
+    "weather_agent",
+    "budget_agent",
+    "itinerary_agent",
+}
+
+AGENT_ORDER = [
+    "flight_agent",
+    "hotel_agent",
+    "weather_agent",
+    "budget_agent",
+    "itinerary_agent",
+]
+
+def _llm_text(system_prompt: str, user_prompt: str) -> str:
+    response = llm.invoke(
+        [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_prompt),
+        ]
+    )
+    return str(response.content)
+
+def _json_from_llm(text: str) -> dict[str, Any]:
+    """Extract the first complete JSON object returned by the model"""
+    start = text.find("{")
+    end = text.rfind("}")
+
+    if start == -1 or end == -1 or end < start:
+        raise ValueError("The model did not return a JSON object.")
+    
+    return json.loads(text[start: end + 1])
+
+def _empty_constraints() -> dict[str, Any]:
+    return {
+        "destination": "",
+        "origin": "",
+        "duration": "",
+        "budget": "",
+        "travel_style": "",
+        "special_preferences": [],
+    }
 
 
 # Flight Agent
