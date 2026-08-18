@@ -562,3 +562,79 @@ def print_eval_summary(results_df: pd.DataFrame):
         print()
     
     print(f"{'='*80}\n")
+
+
+# ============================================================================
+# PHASE 4: REGRESSION TESTING SYSTEM
+# ============================================================================
+
+
+def capture_baseline(dataset_path='eval_dataset.json', baseline_file='baseline_eval_results.csv', run_agent_fn=None, use_simulation=True):
+    print(f"\n{'='*80}")
+    print("CAPTURING BASELINE - Creating performance snapshot")
+    print(f"{'='*80}\n")
+    results_df = run_offline_eval(dataset_path, run_agent_fn, use_simulation)
+    results_df.to_csv(baseline_file, index=False)
+    print(f"✓ Detailed results saved to: {baseline_file}")
+    metrics = compute_aggregate_metrics(results_df)
+    metrics_file = baseline_file.replace('.csv', '_metrics.json')
+    with open(metrics_file, 'w') as f:
+        json.dump(metrics, f, indent=2)
+    print(f"✓ Aggregate metrics saved to: {metrics_file}\n✅ Baseline captured!\n")
+    return metrics
+
+
+def detect_regression(current_results, baseline_path='baseline_eval_results.csv', threshold=0.05):
+    print(f"\n{'='*80}")
+    print("REGRESSION DETECTION - Comparing against baseline")
+    print(f"{'='*80}\n")
+    try:
+        baseline_df = pd.read_csv(baseline_path)
+    except FileNotFoundError:
+        return {'error': 'Baseline file not found'}
+    baseline_metrics = compute_aggregate_metrics(baseline_df)
+    current_metrics = compute_aggregate_metrics(current_results)
+    regressions, improvements = {}, {}
+    lower_is_better = {'avg_latency_seconds', 'median_latency_seconds', 'p95_latency_seconds'}
+    for metric_name, baseline_value in baseline_metrics.items():
+        if metric_name in ['total_tests', 'tests_passed', 'tests_failed'] or baseline_value == 0:
+            continue
+        current_value = current_metrics.get(metric_name, baseline_value)
+        change = (current_value - baseline_value) / baseline_value
+        data = {'baseline': baseline_value, 'current': current_value, 'change_pct': change * 100}
+        if metric_name in lower_is_better:
+            if change > threshold:
+                regressions[metric_name] = data
+            elif change < -threshold:
+                improvements[metric_name] = data
+        else:
+            if change < -threshold:
+                regressions[metric_name] = data
+            elif change > threshold:
+                improvements[metric_name] = data
+    print(f"✓ Analysis complete!\n")
+    return {'has_regression': len(regressions) > 0, 'regressions': regressions, 'improvements': improvements, 'threshold': threshold * 100}
+
+
+def print_regression_report(result):
+    if 'error' in result:
+        print(f"\n❌ ERROR: {result['error']}\n")
+        return
+    print(f"\n{'='*80}")
+    print("REGRESSION TEST REPORT")
+    print(f"{'='*80}\n")
+    print("Status: ❌ REGRESSIONS DETECTED\n" if result['has_regression'] else "Status: ✅ NO REGRESSIONS\n")
+    print(f"Threshold: ±{result['threshold']:.1f}%\n")
+    if result['regressions']:
+        print(f"⚠️  DEGRADED ({len(result['regressions'])})")
+        for name, d in result['regressions'].items():
+            print(f"  • {name}: {d['baseline']:.2f} → {d['current']:.2f} ({d['change_pct']:+.2f}%)")
+        print()
+    if result['improvements']:
+        print(f"✨ IMPROVED ({len(result['improvements'])})")
+        for name, d in result['improvements'].items():
+            print(f"  • {name}: {d['baseline']:.2f} → {d['current']:.2f} ({d['change_pct']:+.2f}%)")
+        print()
+
+
+# PHASE 4 COMPLETE ✓
