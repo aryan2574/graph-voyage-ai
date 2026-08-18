@@ -22,8 +22,10 @@ WEATHER_SERVER_PATH = str(
     Path(__file__).resolve().parent / "custom_weather_mcp_server.py"
 )
 
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+
 llm = ChatGroq(
-    model="llama-3.3-70b-versatile",
+    model=GROQ_MODEL,
     api_key=GROQ_API_KEY
 )
 
