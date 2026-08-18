@@ -216,3 +216,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Evaluation Results (generated outputs - don't commit)
+eval_results_*.csv
+eval_metrics_*.json
+eval_results_latest.csv
+eval_metrics_latest.json
+baseline.csv
+baseline_metrics.json
