@@ -1,5 +1,6 @@
 import os
 import certifi
+import time
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -99,6 +100,12 @@ class TravelState(TypedDict, total=False):
     final_response: str
 
     llm_calls: int
+    
+    # EVAL INSTRUMENTATION: Track execution for evaluation
+    tools_used: Annotated[list[str], operator.add]
+    trajectory: Annotated[list[str], operator.add]
+    start_time: float
+    end_time: float
 
 
 KNOWN_AGENTS = {
@@ -201,6 +208,7 @@ def supervisor_agent(state: TravelState):
             "final_response": reason,
             "messages": [AIMessage(content=f"Guardrail blocked request: {reason}")],
             "llm_calls": llm_calls,
+            "trajectory": ["supervisor_agent"],
         }
 
     supervisor_prompt = f"""
@@ -271,6 +279,7 @@ def supervisor_agent(state: TravelState):
         "supervisor_reasoning": reasoning,
         "messages": [AIMessage(content="Supervisor created the agent plan.")],
         "llm_calls": llm_calls,
+        "trajectory": ["supervisor_agent"],
     }
 
 
@@ -281,6 +290,7 @@ def guardrail_blocked_agent(state: TravelState):
     return {
         "final_response": reason,
         "messages": [AIMessage(content=reason)],
+        "trajectory": ["guardrail_blocked_agent"],
     }
 
 
@@ -296,6 +306,8 @@ def flight_agent(state: TravelState):
         "flight_results": flight_data,
         "messages": [AIMessage(content="Flight results fetched")],
         "llm_calls": state.get("llm_calls", 0) + 1,
+        "tools_used": ["search_flights"],
+        "trajectory": ["flight_agent"],
     }
 
 
@@ -311,6 +323,8 @@ def hotel_agent(state: TravelState):
         "hotel_results": hotel_results,
         "messages": [AIMessage(content="Hotel information fetched.")],
         "llm_calls": state.get("llm_calls", 0) + 1,
+        "tools_used": ["tavily_mcp_search"],
+        "trajectory": ["hotel_agent"],
     }
 
 
@@ -332,6 +346,8 @@ def weather_agent(state: TravelState):
         "weather_results": weather_results,
         "messages": [AIMessage(content="Weather information fetched")],
         "llm_calls": state.get("llm_calls", 0) + 1,
+        "tools_used": ["weather_mcp_search", "forecast_mcp_search"],
+        "trajectory": ["weather_agent"],
     }
 
 
@@ -364,6 +380,7 @@ def budget_agent(state: TravelState):
         "budget_results": response.content,
         "messages": [AIMessage(content="Budget assessment generated.")],
         "llm_calls": state.get("llm_calls", 0) + 1,
+        "trajectory": ["budget_agent"],
     }
 
 
@@ -399,6 +416,7 @@ def itinerary_agent(state: TravelState):
         "approval_request": approval_request,
         "messages": [AIMessage(content="Draft itinerary created for human review.")],
         "llm_calls": state.get("llm_calls", 0) + 1,
+        "trajectory": ["itinerary_agent"],
     }
 
 
@@ -426,6 +444,7 @@ def human_approval_agent(state: TravelState):
         "approved": approved,
         "human_feedback": human_feedback,
         "messages": [AIMessage(content=f"Human review {status}.")],
+        "trajectory": ["human_approval_agent"],
     }
 
 
@@ -479,6 +498,8 @@ def final_agent(state: TravelState):
         "final_response": response.content,
         "messages": [response],
         "llm_calls": state.get("llm_calls", 0) + 1,
+        "trajectory": ["final_agent"],
+        "end_time": time.time(),
     }
 
 
@@ -572,6 +593,11 @@ def _serialize_result(result: dict[str, Any], thread_id: str) -> dict[str, Any]:
     if interrupt_payload:
         answer = interrupt_payload.get("draft_itinerary") or result.get("itinerary", "")
 
+    # Calculate latency if both timestamps exist
+    start_time = result.get("start_time", 0.0)
+    end_time = result.get("end_time", 0.0)
+    latency = end_time - start_time if end_time > 0 else 0.0
+
     return {
         "thread_id": thread_id,
         "answer": answer,
@@ -598,6 +624,12 @@ def _serialize_result(result: dict[str, Any], thread_id: str) -> dict[str, Any]:
         "approved": result.get("approved"),
         "human_feedback": result.get("human_feedback", ""),
         "llm_calls": result.get("llm_calls", 0),
+        # EVAL INSTRUMENTATION: Include metrics for evaluation
+        "tools_used": result.get("tools_used", []),
+        "trajectory": result.get("trajectory", []),
+        "latency_seconds": latency,
+        "start_time": start_time,
+        "end_time": end_time,
     }
 
 
@@ -627,6 +659,10 @@ def run_travel_agent(user_input: str, thread_id: str | None = None):
             "human_feedback": "",
             "final_response": "",
             "llm_calls": 0,
+            "tools_used": [],
+            "trajectory": [],
+            "start_time": time.time(),
+            "end_time": 0.0,
         },
         config=config,
     )
