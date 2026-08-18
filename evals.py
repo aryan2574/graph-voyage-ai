@@ -187,3 +187,378 @@ def llm_as_judge(question:str, answer: str) -> str:
 
     response = llm.invoke(judge_promt)
     return content_to_text(response.content).strip()
+
+
+# This implements BATCH EVALUATION - running all tests automatically and
+# generating comprehensive metrics reports.
+
+import json
+from typing import Optional
+
+
+def run_offline_eval(
+    dataset_path: str = "eval_dataset.json",
+    run_agent_fn: Optional[callable] = None,
+    use_simulation: bool = True
+) -> pd.DataFrame:
+    """
+    Run all test cases from dataset and collect results in a DataFrame.
+    
+    This is the BATCH EVALUATION SYSTEM - it runs all your tests automatically
+    and generates a comprehensive report.
+    
+    Args:
+        dataset_path: Path to eval_dataset.json file
+        run_agent_fn: Function to run your agent (e.g., run_travel_agent)
+                     If None, uses simulation mode
+        use_simulation: If True, simulates results for demo purposes
+    
+    Returns:
+        DataFrame with one row per test case, containing all metrics
+    
+    Example:
+        >>> df = run_offline_eval()  # Simulated mode
+        >>> print(df[['test_id', 'passed', 'latency_seconds']])
+        
+        Or with real agent:
+        >>> from backend import run_travel_agent
+        >>> df = run_offline_eval(run_agent_fn=run_travel_agent, use_simulation=False)
+    """
+    print(f"\n{'='*80}")
+    print("OFFLINE EVALUATION PIPELINE - Starting batch evaluation")
+    print(f"{'='*80}\n")
+    
+    # Step 1: Load test dataset
+    print(f"📂 Loading dataset from {dataset_path}...")
+    with open(dataset_path, 'r') as f:
+        test_cases = json.load(f)
+    print(f"✓ Loaded {len(test_cases)} test cases\n")
+    
+    # Step 2: Initialize results storage
+    results = []
+    
+    # Step 3: Run each test case
+    print(f"🚀 Running evaluations...\n")
+    for i, test_case in enumerate(test_cases, 1):
+        test_id = test_case['id']
+        print(f"[{i}/{len(test_cases)}] Testing: {test_id} - {test_case['query'][:60]}...")
+        
+        # Run the agent (simulated or real)
+        if use_simulation or run_agent_fn is None:
+            # Simulation mode - for demo purposes
+            agent_result = _simulate_agent_run(test_case)
+        else:
+            # Real mode - actually run your backend agent
+            agent_result = _run_real_agent(test_case, run_agent_fn)
+        
+        # Evaluate the result using our evaluation functions
+        eval_result = _evaluate_test_case(test_case, agent_result)
+        
+        # Store results
+        results.append(eval_result)
+        
+        # Print quick summary
+        status = "✅ PASS" if eval_result['passed'] else "❌ FAIL"
+        print(f"   {status} | Latency: {eval_result['latency_seconds']:.2f}s\n")
+    
+    # Step 4: Convert results to DataFrame
+    df = pd.DataFrame(results)
+    
+    print(f"{'='*80}")
+    print(f"✓ Batch evaluation complete! Processed {len(df)} test cases")
+    print(f"{'='*80}\n")
+    
+    return df
+
+
+def _simulate_agent_run(test_case: dict) -> dict:
+    """Simulate agent execution for demo purposes."""
+    import random
+    
+    # Simulate response based on test type
+    if test_case['type'] == 'safety':
+        answer = "I cannot help with that request."
+        tools_used = []
+        trajectory = test_case.get('expected_trajectory', ['supervisor_agent', 'guardrail_blocked_agent'])
+    elif test_case['type'] == 'reliability':
+        answer = "I'm sorry, I couldn't find information about that location."
+        tools_used = test_case.get('expected_tools', [])
+        trajectory = test_case.get('expected_trajectory', ['supervisor_agent', 'flight_agent'])
+    else:
+        # Normal/edge cases - simulate a reasonable response
+        answer = f"Here's a travel plan for: {test_case['query']}"
+        if 'expected_keywords' in test_case:
+            # Include some keywords in the answer
+            for keyword in test_case['expected_keywords'][:3]:
+                answer += f" {keyword}"
+        tools_used = test_case.get('expected_tools', [])
+        trajectory = test_case.get('expected_trajectory', ['supervisor_agent', 'final_agent'])
+    
+    # Simulate latency (add some randomness)
+    base_latency = 8.0
+    latency = base_latency + random.uniform(-2, 5)
+    
+    return {
+        "answer": answer,
+        "tools_used": tools_used,
+        "trajectory": trajectory,
+        "latency_seconds": latency,
+        "guardrail_allowed": test_case['type'] != 'safety',
+    }
+
+
+def _run_real_agent(test_case: dict, run_agent_fn: callable) -> dict:
+    """Run the actual agent system."""
+    import time
+    
+    start_time = time.time()
+    
+    # Run your backend agent
+    result = run_agent_fn(test_case['query'])
+    
+    # Calculate latency if not provided
+    if 'latency_seconds' not in result:
+        result['latency_seconds'] = time.time() - start_time
+    
+    return result
+
+
+def _evaluate_test_case(test_case: dict, agent_result: dict) -> dict:
+    """
+    Evaluate a single test case against agent result.
+    
+    This applies ALL evaluation functions and combines the results.
+    """
+    eval_metrics = {
+        'test_id': test_case['id'],
+        'test_type': test_case['type'],
+        'query': test_case['query'],
+    }
+    
+    # 1. Answer Correctness
+    if 'expected_keywords' in test_case:
+        eval_metrics['answer_correct'] = evaluate_answer(
+            agent_result['answer'],
+            test_case['expected_keywords']
+        )
+        # Calculate correctness score (percentage of keywords found)
+        keywords_found = sum(
+            1 for kw in test_case['expected_keywords']
+            if kw.lower() in agent_result['answer'].lower()
+        )
+        eval_metrics['correctness_score'] = keywords_found / len(test_case['expected_keywords'])
+    else:
+        eval_metrics['answer_correct'] = True
+        eval_metrics['correctness_score'] = 1.0
+    
+    # 2. Tool Selection
+    if 'expected_tools' in test_case:
+        eval_metrics['tool_selection_correct'] = evaluate_tool_selection(
+            agent_result.get('tools_used', []),
+            test_case['expected_tools']
+        )
+    else:
+        eval_metrics['tool_selection_correct'] = True
+    
+    # 3. Trajectory
+    if 'expected_trajectory' in test_case:
+        eval_metrics['trajectory_correct'] = evaluate_trajectory(
+            agent_result.get('trajectory', []),
+            test_case['expected_trajectory']
+        )
+    else:
+        eval_metrics['trajectory_correct'] = True
+    
+    # 4. Latency
+    if 'max_latency' in test_case:
+        eval_metrics['latency_ok'] = evaluate_latency(
+            agent_result.get('latency_seconds', 0),
+            test_case['max_latency']
+        )
+    else:
+        eval_metrics['latency_ok'] = True
+    
+    eval_metrics['latency_seconds'] = agent_result.get('latency_seconds', 0)
+    
+    # 5. Safety & Reliability
+    eval_metrics['safety_passed'] = evaluate_safety_and_reliability(
+        test_case,
+        agent_result
+    )
+    
+    # 6. Overall Pass/Fail
+    # A test passes if ALL critical checks pass
+    eval_metrics['passed'] = (
+        eval_metrics['answer_correct'] and
+        eval_metrics['tool_selection_correct'] and
+        eval_metrics['trajectory_correct'] and
+        eval_metrics['latency_ok'] and
+        eval_metrics['safety_passed']
+    )
+    
+    return eval_metrics
+
+
+def compute_aggregate_metrics(results_df: pd.DataFrame) -> dict:
+    """
+    Compute system-level metrics from all test results.
+    
+    This gives you the "big picture" - how well your system performs overall.
+    
+    Args:
+        results_df: DataFrame from run_offline_eval()
+    
+    Returns:
+        Dictionary with aggregate metrics
+    
+    Example:
+        >>> df = run_offline_eval()
+        >>> metrics = compute_aggregate_metrics(df)
+        >>> print(f"Pass Rate: {metrics['pass_rate']:.1f}%")
+        Pass Rate: 75.0%
+    """
+    if len(results_df) == 0:
+        return {"error": "No results to analyze"}
+    
+    # Clean up any None values in passed column
+    results_df['passed'] = results_df['passed'].fillna(False)
+    
+    metrics = {
+        # Overall performance
+        "total_tests": len(results_df),
+        "tests_passed": int(results_df['passed'].sum()),
+        "tests_failed": int(len(results_df) - results_df['passed'].sum()),
+        "pass_rate": float(results_df['passed'].mean() * 100),
+        
+        # Correctness
+        "avg_correctness_score": float(results_df['correctness_score'].mean() * 100),
+        "tool_selection_accuracy": float(results_df['tool_selection_correct'].mean() * 100),
+        "trajectory_accuracy": float(results_df['trajectory_correct'].mean() * 100),
+        
+        # Performance
+        "avg_latency_seconds": float(results_df['latency_seconds'].mean()),
+        "median_latency_seconds": float(results_df['latency_seconds'].median()),
+        "p95_latency_seconds": float(results_df['latency_seconds'].quantile(0.95)),
+        "min_latency_seconds": float(results_df['latency_seconds'].min()),
+        "max_latency_seconds": float(results_df['latency_seconds'].max()),
+        
+        # Safety & Reliability
+        "safety_pass_rate": float(results_df['safety_passed'].mean() * 100),
+        "latency_pass_rate": float(results_df['latency_ok'].mean() * 100),
+    }
+    
+    return metrics
+
+
+def compute_per_test_type_metrics(results_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Break down metrics by test type (normal, edge, safety, reliability).
+    
+    This helps you identify which types of requests your system handles well
+    and which need improvement.
+    
+    Args:
+        results_df: DataFrame from run_offline_eval()
+    
+    Returns:
+        DataFrame with metrics per test type
+    
+    Example:
+        >>> df = run_offline_eval()
+        >>> by_type = compute_per_test_type_metrics(df)
+        >>> print(by_type)
+                    count  pass_rate  avg_latency
+        normal         5       80.0         12.5
+        safety         3      100.0          2.1
+        reliability    2       50.0         15.3
+    """
+    if len(results_df) == 0:
+        return pd.DataFrame()
+    
+    grouped = results_df.groupby('test_type').agg({
+        'passed': ['count', 'mean', 'sum'],
+        'latency_seconds': 'mean',
+        'correctness_score': 'mean',
+        'safety_passed': 'mean'
+    }).round(2)
+    
+    # Flatten column names
+    grouped.columns = ['count', 'pass_rate', 'tests_passed', 'avg_latency', 'avg_correctness', 'safety_rate']
+    grouped['pass_rate'] = (grouped['pass_rate'] * 100).round(1)
+    grouped['avg_correctness'] = (grouped['avg_correctness'] * 100).round(1)
+    grouped['safety_rate'] = (grouped['safety_rate'] * 100).round(1)
+    
+    return grouped
+
+
+def print_eval_summary(results_df: pd.DataFrame):
+    """
+    Print a beautiful summary of evaluation results.
+    
+    This is what you'll look at to understand your system's performance!
+    """
+    print(f"\n{'='*80}")
+    print("EVALUATION SUMMARY REPORT")
+    print(f"{'='*80}\n")
+    
+    # Aggregate metrics
+    metrics = compute_aggregate_metrics(results_df)
+    
+    print("📊 OVERALL PERFORMANCE")
+    print(f"{'─'*80}")
+    print(f"  Total Tests:       {metrics['total_tests']}")
+    print(f"  Passed:            {metrics['tests_passed']} ✅")
+    print(f"  Failed:            {metrics['tests_failed']} ❌")
+    print(f"  Pass Rate:         {metrics['pass_rate']:.1f}%")
+    print()
+    
+    print("✓ CORRECTNESS METRICS")
+    print(f"{'─'*80}")
+    print(f"  Avg Correctness:   {metrics['avg_correctness_score']:.1f}%")
+    print(f"  Tool Selection:    {metrics['tool_selection_accuracy']:.1f}%")
+    print(f"  Trajectory:        {metrics['trajectory_accuracy']:.1f}%")
+    print()
+    
+    print("⚡ PERFORMANCE METRICS")
+    print(f"{'─'*80}")
+    print(f"  Average Latency:   {metrics['avg_latency_seconds']:.2f}s")
+    print(f"  Median Latency:    {metrics['median_latency_seconds']:.2f}s")
+    print(f"  P95 Latency:       {metrics['p95_latency_seconds']:.2f}s")
+    print(f"  Min/Max:           {metrics['min_latency_seconds']:.2f}s / {metrics['max_latency_seconds']:.2f}s")
+    print()
+    
+    print("🛡️ SAFETY & RELIABILITY")
+    print(f"{'─'*80}")
+    print(f"  Safety Pass Rate:  {metrics['safety_pass_rate']:.1f}%")
+    print(f"  Latency Pass Rate: {metrics['latency_pass_rate']:.1f}%")
+    print()
+    
+    # Per-type breakdown
+    print("📋 BREAKDOWN BY TEST TYPE")
+    print(f"{'─'*80}")
+    by_type = compute_per_test_type_metrics(results_df)
+    print(by_type.to_string())
+    print()
+    
+    # Failed tests
+    failed_tests = results_df[results_df['passed'] == False]
+    if len(failed_tests) > 0:
+        print("❌ FAILED TESTS (Need Investigation)")
+        print(f"{'─'*80}")
+        for _, test in failed_tests.iterrows():
+            print(f"  • {test['test_id']}: {test['query'][:60]}...")
+            reasons = []
+            if not test['answer_correct']:
+                reasons.append("incorrect answer")
+            if not test['tool_selection_correct']:
+                reasons.append("wrong tools")
+            if not test['trajectory_correct']:
+                reasons.append("wrong trajectory")
+            if not test['latency_ok']:
+                reasons.append(f"too slow ({test['latency_seconds']:.1f}s)")
+            if not test['safety_passed']:
+                reasons.append("safety failed")
+            print(f"    Reason: {', '.join(reasons)}")
+        print()
+    
+    print(f"{'='*80}\n")
