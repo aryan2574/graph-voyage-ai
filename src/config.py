@@ -32,14 +32,22 @@ TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 
 def get_database_url() -> str:
-    """Get PostgreSQL connection string with SSL"""
+    """Get PostgreSQL connection string with appropriate SSL mode"""
     database_url = DATABASE_URL
     if not database_url:
         raise ValueError("DATABASE_URL not found in .env")
     
+    # Only add SSL mode if not already specified
     if "sslmode" not in database_url:
+        # Check if this is a local database (Docker, localhost, etc.)
+        is_local = any(host in database_url.lower() for host in [
+            "localhost", "127.0.0.1", "@db:", "host.docker.internal"
+        ])
+        
         separator = "&" if "?" in database_url else "?"
-        database_url = f"{database_url}{separator}sslmode=require"
+        # Local databases don't need SSL, remote ones (like Render) do
+        ssl_mode = "disable" if is_local else "require"
+        database_url = f"{database_url}{separator}sslmode={ssl_mode}"
     
     return database_url
 
