@@ -227,3 +227,9 @@ eval_metrics_latest.json
 # baseline_eval_results.csv
 # baseline_eval_metrics.json
 # Uncomment above lines if you want to commit baseline files
+
+# Kubernetes secrets with actual API keys (never commit!)
+k8s/01-secret.yaml
+
+# Cursor agent transcripts
+.cursor/projects/*/terminals/
