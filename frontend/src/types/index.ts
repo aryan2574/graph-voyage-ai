@@ -17,7 +17,7 @@ export interface TravelResponse {
   requires_approval?: boolean;
   supervisor_reasoning?: string;
   agents_involved?: string[];
-  guardrail_passed?: boolean;
+  guardrail_allowed?: boolean;
   latency_seconds?: number;
   error?: string;
 }

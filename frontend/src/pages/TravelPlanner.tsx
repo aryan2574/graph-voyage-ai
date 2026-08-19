@@ -191,9 +191,9 @@ const TravelPlanner = () => {
               <h3>Execution Plan</h3>
             </div>
             <div
-              className={`badge ${response.guardrail_passed ? "success" : "error"}`}
+              className={`badge ${response.guardrail_allowed ? "success" : "error"}`}
             >
-              {response.guardrail_passed ? (
+              {response.guardrail_allowed ? (
                 <>
                   <Shield size={16} />
                   Guardrail Passed
