@@ -189,8 +189,13 @@ def supervisor_agent(state: TravelState):
     Valid requests can include destinations, flights, hotels, weather, budgets, visas, transportation,
     sightseeing, food, packing or itineraries.
 
-    Block clearly unrelated requests and requests asking for harmful or illegal instructions.
-    Do not block a valid travel request merely because some details are missing.
+    IMPORTANT: Be permissive! Allow any request that mentions travel, trips, destinations, countries, cities,
+    flights, hotels, tourism, vacation, or similar travel-related terms.
+    
+    Only block requests that are:
+    - Clearly about unrelated topics (cooking, sports, programming, etc.)
+    - Asking for harmful or illegal instructions
+    - Completely nonsensical or spam
 
     Return strict JSON only:
     {{
@@ -202,17 +207,34 @@ def supervisor_agent(state: TravelState):
     """
 
     try:
+        print(f"\n{'='*60}")
+        print(f"🛡️ GUARDRAIL CHECK")
+        print(f"{'='*60}")
+        print(f"📝 User Query: {query}")
+        print(f"{'='*60}")
+        
         guardrail_raw = _llm_text(
             "You are the input guardrail for a travel planning application. "
             "Return strict JSON only.",
             guardrail_prompt,
         )
+        
+        print(f"🤖 LLM Raw Response:\n{guardrail_raw}")
+        print(f"{'='*60}")
+        
         guardrail_result = _json_from_llm(guardrail_raw)
         allowed = bool(guardrail_result.get("allowed", True))
         guardrail_reason = str(guardrail_result.get("reason", "")).strip()
+        
+        print(f"✅ Parsed Result:")
+        print(f"   - Allowed: {allowed}")
+        print(f"   - Reason: {guardrail_reason or '(none)'}")
+        print(f"{'='*60}\n")
+        
         llm_calls += 1
     except Exception as exc:
-        print(f"Guardrail fallback used: {exc}")
+        print(f"❌ Guardrail Exception: {exc}")
+        print(f"⚠️ Guardrail fallback used - allowing request by default")
         allowed = True
         guardrail_reason = "Guardrail validation fallback allowed the request"
 
@@ -221,6 +243,10 @@ def supervisor_agent(state: TravelState):
             "GraphVoyageAI can only help with travel-planning requests. "
             "Please ask about a destination, flight, hotel, weather, budget, or itinerary."
         )
+        
+        print(f"\n🚫 GUARDRAIL BLOCKED REQUEST")
+        print(f"Reason: {reason}\n")
+        
         return {
             "guardrail_allowed": False,
             "guardrail_reason": reason,
