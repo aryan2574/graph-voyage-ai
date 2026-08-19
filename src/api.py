@@ -34,7 +34,7 @@ import nest_asyncio
 
 nest_asyncio.apply()
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent  # Project root, not src/
 
 
 from src.config import get_database_url
