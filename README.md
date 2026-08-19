@@ -19,15 +19,19 @@ all coordinated through a LangGraph workflow.
 - 🏨 Hotel suggestions using Tavily search
 - 🧠 Multi-agent orchestration with LangGraph
 - 📝 Structured travel itinerary generation
-- 🌐 FastAPI backend with a simple web interface
+- ⚛️ Modern React + TypeScript frontend with Vite
+- 📊 Real-time metrics dashboard with charts
+- 🌐 FastAPI backend with RESTful API
 - 💾 Conversation state persistence using PostgreSQL
 - ⚡ LLM-powered responses with Groq
+- 🐳 Docker & Kubernetes support
+- 🔄 Complete CI/CD pipeline with GitHub Actions
 
 ## Tech Stack
 
-- Python 3.10+
+### Backend
+- Python 3.11+
 - FastAPI
-- Jinja2 + HTML/CSS/JavaScript frontend
 - LangGraph
 - LangChain
 - Groq LLMs
@@ -35,16 +39,39 @@ all coordinated through a LangGraph workflow.
 - Tavily API
 - AviationStack API
 
+### Frontend
+- React 19
+- TypeScript
+- Vite
+- Recharts (for metrics visualization)
+- Axios
+- React Router
+
+### DevOps
+- Docker & Docker Compose
+- Kubernetes
+- GitHub Actions (CI/CD)
+- Render (deployment)
+
 ## Project Structure
 
 ```text
-.
-├── app.py                # FastAPI app entry point
-├── backend.py            # LangGraph travel workflow
-├── requirements.txt      # Python dependencies
-├── static/               # Static frontend assets
-├── templates/            # HTML templates
-└── tools/                # Flight and web search integrations
+GraphVoyageAI/
+├── src/                    # Application source code
+│   ├── api.py             # FastAPI application
+│   ├── agents.py          # LangGraph multi-agent system
+│   ├── monitoring.py      # Real-time monitoring
+│   ├── mcp/               # MCP integration
+│   └── tools/             # Agent tools
+├── tests/                 # Testing & evaluation
+│   ├── evals/            # Evaluation system
+│   └── fixtures/         # Test data
+├── frontend/              # React + TypeScript UI
+├── k8s/                   # Kubernetes configs
+├── .github/workflows/     # CI/CD
+├── requirements.txt       # Python dependencies
+├── Dockerfile            # Docker config
+└── docker-compose.yml    # Local dev setup
 ```
 
 ## Prerequisites
@@ -58,6 +85,49 @@ Before running the project locally, make sure you have:
   - Tavily
   - AviationStack
 
+## Getting Started
+
+### 1. Install Dependencies
+
+```bash
+# Clone repository
+git clone <repository-url>
+cd GraphVoyageAI
+
+# Install Python packages
+pip install -r requirements.txt
+```
+
+### 2. Configure Environment
+
+```bash
+cp .env.example .env
+# Edit .env with your API keys and DATABASE_URL
+```
+
+### 3. Run Application
+
+**Development Mode:**
+```bash
+# Start backend (auto-initializes database)
+uvicorn src.api:app --reload --host 127.0.0.1 --port 8000
+
+# In another terminal, start frontend
+cd frontend
+npm install
+npm run dev
+```
+
+**Using Docker:**
+```bash
+docker-compose up
+```
+
+Visit:
+- Frontend: `http://localhost:5173` (dev) or `http://localhost:8000` (production)
+- API Docs: `http://localhost:8000/docs`
+- Dashboard: `http://localhost:5173/dashboard`
+
 ## Environment Variables
 
 Create a .env file in the project root with the following variables:
@@ -70,6 +140,14 @@ TAVILY_API_KEY=your_tavily_api_key
 DEFAULT_ORIGIN_IATA=DAC
 ```
 
+## Development with Conda (Windows)
+
+```bash
+source /c/Users/HP/miniconda3/etc/profile.d/conda.sh
+conda activate travel
+uvicorn src.api:app --reload
+```
+
 ## Installation
 
 ```bash
@@ -78,24 +156,13 @@ source .venv/bin/activate   # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-## Running the App
-
-Start the FastAPI server:
-
-```bash
-python app.py
-```
-
-Then open your browser at:
-
-```text
-http://127.0.0.1:8000/
-```
-
 ## API Endpoints
 
-- GET /health - Health check
-- POST /api/travel - Submit a travel request
+- `GET /` - Serve React frontend (production) or home page
+- `GET /health` - Health check
+- `GET /api/metrics` - Get system metrics
+- `POST /api/travel` - Submit a travel request
+- `POST /api/travel/approve` - Approve/reject travel plan
 
 Example request:
 

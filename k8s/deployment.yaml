@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: graphvoyage-app
+  namespace: graphvoyage
+  labels:
+    app: graphvoyage
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: graphvoyage
+  template:
+    metadata:
+      labels:
+        app: graphvoyage
+        version: v1
+    spec:
+      containers:
+      - name: graphvoyage
+        image: ghcr.io/yourusername/graphvoyageai:latest  # Update with your image
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: graphvoyage-secrets
+              key: DATABASE_URL
+        - name: GROQ_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: graphvoyage-secrets
+              key: GROQ_API_KEY
+        - name: AVIATIONSTACK_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: graphvoyage-secrets
+              key: AVIATIONSTACK_API_KEY
+        - name: TAVILY_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: graphvoyage-secrets
+              key: TAVILY_API_KEY
+        - name: DEFAULT_ORIGIN_IATA
+          valueFrom:
+            configMapKeyRef:
+              name: graphvoyage-config
+              key: DEFAULT_ORIGIN_IATA
+        - name: ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: graphvoyage-config
+              key: ENVIRONMENT
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 0
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 30

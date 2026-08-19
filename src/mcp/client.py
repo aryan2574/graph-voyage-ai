@@ -11,7 +11,7 @@ os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()
 
 load_dotenv()
 
-TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
+from src.config import TAVILY_API_KEY, TAVILY_MCP_URL
 AVIATIONSTACK_API_KEY = os.getenv("AVIATIONSTACK_API_KEY")
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -22,8 +22,10 @@ WEATHER_SERVER_PATH = str(
     Path(__file__).resolve().parent / "custom_weather_mcp_server.py"
 )
 
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+
 llm = ChatGroq(
-    model="llama-3.3-70b-versatile",
+    model=GROQ_MODEL,
     api_key=GROQ_API_KEY
 )
 
@@ -31,7 +33,7 @@ client = MultiServerMCPClient(
     {
         "tavily" : {
             "transport" : "streamable_http",
-            "url" : f"https://mcp.tavily.com/mcp/?tavilyApiKey={TAVILY_API_KEY}"
+            "url" : f"{TAVILY_MCP_URL}?tavilyApiKey={TAVILY_API_KEY}"
         },
         "weather": {
             "transport" : "stdio",

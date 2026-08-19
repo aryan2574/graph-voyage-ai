@@ -3,26 +3,29 @@ import requests
 import os
 from dotenv import load_dotenv
 
+from src.config import (
+    OPENWEATHER_BASE_URL,
+    OPENWEATHER_API_KEY,
+    WEATHER_API_TIMEOUT,
+)
+
 load_dotenv()
 
 mcp = FastMCP("Weather MCP Server")
-
-OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
-
-BASE_URL="https://api.openweathermap.org/data/2.5"
 
 # Use decorator to make it mcp tool
 @mcp.tool()
 def get_current_weather(city:str):
     
-    url = f"{BASE_URL}/weather"
+    url = f"{OPENWEATHER_BASE_URL}/weather"
     response = requests.get(
         url,
         params={
             "q": city,
-            "appid":OPENWEATHER_API_KEY,
-            "units":"metric"
-        }
+            "appid": OPENWEATHER_API_KEY,
+            "units": "metric"
+        },
+        timeout=WEATHER_API_TIMEOUT
     )
 
     data = response.json()
@@ -42,15 +45,15 @@ def get_current_weather(city:str):
 @mcp.tool()
 def get_forecast(city:str):
 
-    url=f"{BASE_URL}/forecast"
+    url = f"{OPENWEATHER_BASE_URL}/forecast"
     
     params = {
-        "q":city,
-        "appid":OPENWEATHER_API_KEY,
-        "units":"metric"
+        "q": city,
+        "appid": OPENWEATHER_API_KEY,
+        "units": "metric"
     }
 
-    response = requests.get(url,params = params)
+    response = requests.get(url, params=params, timeout=WEATHER_API_TIMEOUT)
 
     data = response.json()
 

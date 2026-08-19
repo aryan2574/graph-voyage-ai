@@ -6,118 +6,25 @@ import pycountry
 import requests
 from dotenv import load_dotenv
 
+from src.config import (
+    AVIATIONSTACK_BASE_URL,
+    AVIATIONSTACK_API_KEY,
+    FLIGHT_API_TIMEOUT,
+    DEFAULT_ORIGIN_IATA,
+)
+from src.constants import (
+    COUNTRY_ALIASES,
+    COUNTRY_MAIN_AIRPORT,
+    CITY_MAIN_AIRPORT,
+)
+
 load_dotenv()
 
 os.environ["SSL_CERT_FILE"] = certifi.where()
 os.environ["REQUESTS_CA_BUNDLE"] = certifi.where()
 
-API_KEY = os.getenv("AVIATIONSTACK_API_KEY")
-
-# Default origin when user says only destination, e.g. "Japan trip"
-# Change this if your default location is not Bangladesh/Dhaka.
-DEFAULT_ORIGIN_IATA = os.getenv("DEFAULT_ORIGIN_IATA", "DAC")
-
-
-BASE_URL = "https://api.aviationstack.com/v1/flights"
-
-
+# Load airport database
 AIRPORTS = airportsdata.load("IATA")
-
-
-
-COUNTRY_ALIASES = {
-    "usa": "US",
-    "u.s.a": "US",
-    "u.s.": "US",
-    "america": "US",
-    "united states": "US",
-    "uk": "GB",
-    "u.k.": "GB",
-    "britain": "GB",
-    "england": "GB",
-    "uae": "AE",
-    "dubai": "AE",
-    "south korea": "KR",
-    "korea": "KR",
-    "russia": "RU",
-    "vietnam": "VN",
-    "bangladesh": "BD",
-    "india": "IN",
-    "japan": "JP",
-    "china": "CN",
-    "singapore": "SG",
-    "malaysia": "MY",
-    "thailand": "TH",
-    "indonesia": "ID",
-    "nepal": "NP",
-    "qatar": "QA",
-    "saudi arabia": "SA",
-    "turkey": "TR",
-    "canada": "CA",
-    "australia": "AU",
-    "germany": "DE",
-    "france": "FR",
-    "italy": "IT",
-    "spain": "ES",
-}
-
-
-# Preferred main airport for country-level search
-COUNTRY_MAIN_AIRPORT = {
-    "BD": "DAC",
-    "IN": "DEL",
-    "JP": "NRT",
-    "US": "JFK",
-    "GB": "LHR",
-    "AE": "DXB",
-    "SG": "SIN",
-    "MY": "KUL",
-    "TH": "BKK",
-    "ID": "CGK",
-    "CN": "PEK",
-    "KR": "ICN",
-    "NP": "KTM",
-    "QA": "DOH",
-    "SA": "JED",
-    "TR": "IST",
-    "CA": "YYZ",
-    "AU": "SYD",
-    "DE": "FRA",
-    "FR": "CDG",
-    "IT": "FCO",
-    "ES": "MAD",
-}
-
-
-
-
-CITY_MAIN_AIRPORT = {
-    "dhaka": "DAC",
-    "delhi": "DEL",
-    "new delhi": "DEL",
-    "mumbai": "BOM",
-    "kolkata": "CCU",
-    "chennai": "MAA",
-    "bangalore": "BLR",
-    "bengaluru": "BLR",
-    "tokyo": "NRT",
-    "osaka": "KIX",
-    "kyoto": "KIX",
-    "new york": "JFK",
-    "london": "LHR",
-    "dubai": "DXB",
-    "singapore": "SIN",
-    "kuala lumpur": "KUL",
-    "bangkok": "BKK",
-    "doha": "DOH",
-    "istanbul": "IST",
-    "toronto": "YYZ",
-    "sydney": "SYD",
-    "paris": "CDG",
-    "rome": "FCO",
-    "madrid": "MAD",
-    "frankfurt": "FRA",
-}
 
 
 def clean_text(text: str) -> str:
@@ -467,7 +374,7 @@ Arrival:
 
 
 def search_flights(query: str, limit: int = 10):
-    if not API_KEY:
+    if not AVIATIONSTACK_API_KEY:
         return (
             "Flight API error: AVIATIONSTACK_API_KEY is missing.\n"
             "Please add this in your .env file:\n"
@@ -477,7 +384,7 @@ def search_flights(query: str, limit: int = 10):
     dep_iata, arr_iata = parse_route(query)
 
     params = {
-        "access_key": API_KEY,
+        "access_key": AVIATIONSTACK_API_KEY,
         "limit": min(limit, 100),
     }
 
@@ -488,7 +395,7 @@ def search_flights(query: str, limit: int = 10):
         params["arr_iata"] = arr_iata
 
     try:
-        response = requests.get(BASE_URL, params=params, timeout=30)
+        response = requests.get(AVIATIONSTACK_BASE_URL, params=params, timeout=FLIGHT_API_TIMEOUT)
         data = response.json()
     except requests.exceptions.RequestException as e:
         return f"Flight API request failed: {e}"
