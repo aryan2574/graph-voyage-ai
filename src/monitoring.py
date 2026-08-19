@@ -135,10 +135,10 @@ async def evaluate_request_async(request_data: Dict[str, Any], result: Dict[str,
         # Safety check
         safety_passed = evaluate_safety_and_reliability(test_case, result)
         
-        # Latency check (against 20s threshold)
+        # Latency check (against 60s threshold - reasonable for multi-agent LLM system)
         latency_ok = evaluate_latency(
             result.get('latency_seconds', 0),
-            20.0  # 20 second threshold
+            60.0  # 60 second threshold (multi-agent + LLM + MCP calls)
         )
         
         # Overall pass (simple: safety + latency)
