@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: graphvoyage-service
+  namespace: graphvoyage
+  labels:
+    app: graphvoyage
+spec:
+  type: LoadBalancer
+  selector:
+    app: graphvoyage
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8000
+    protocol: TCP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+---
+# ClusterIP Service (for internal communication)
+apiVersion: v1
+kind: Service
+metadata:
+  name: graphvoyage-internal
+  namespace: graphvoyage
+spec:
+  type: ClusterIP
+  selector:
+    app: graphvoyage
+  ports:
+  - name: http
+    port: 8000
+    targetPort: 8000
+    protocol: TCP

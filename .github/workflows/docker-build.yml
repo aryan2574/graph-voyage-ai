@@ -1,0 +1,80 @@
+name: Docker Build & Test
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'Dockerfile'
+      - 'docker-compose*.yml'
+      - 'requirements.txt'
+      - '.github/workflows/docker-build.yml'
+
+jobs:
+  docker-test:
+    name: Test Docker Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build development image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: development
+          push: false
+          load: true
+          tags: graphvoyageai:dev
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build production image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: production
+          push: false
+          load: true
+          tags: graphvoyageai:prod
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Test production image
+        run: |
+          docker run -d --name test-app \
+            -e DATABASE_URL=postgresql://user:pass@localhost/db \
+            -e GROQ_API_KEY=test \
+            -e TAVILY_API_KEY=test \
+            -e AVIATIONSTACK_API_KEY=test \
+            -p 8000:8000 \
+            graphvoyageai:prod
+          
+          sleep 10
+          
+          # Check if container is running
+          docker ps | grep test-app
+          
+          # Check health endpoint
+          curl -f http://localhost:8000/health || exit 1
+          
+          docker stop test-app
+          docker rm test-app
+
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'graphvoyageai:prod'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+        continue-on-error: true
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+        continue-on-error: true
