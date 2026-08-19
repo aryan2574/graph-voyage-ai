@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: graphvoyage
-  labels:
-    name: graphvoyage
-    app: travel-planner

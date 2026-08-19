@@ -1,0 +1,22 @@
+# PostgreSQL Service
+# Provides a stable DNS name and IP for the database
+# Other Pods can connect using: postgres-service.graphvoyage.svc.cluster.local:5432
+# Or simply: postgres-service:5432 (within same namespace)
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: graphvoyage
+  labels:
+    app: postgres
+spec:
+  type: ClusterIP  # Internal only (not exposed outside cluster)
+  selector:
+    app: postgres  # Routes traffic to Pods with this label
+  ports:
+  - port: 5432          # Service port
+    targetPort: 5432    # Container port
+    protocol: TCP
+    name: postgres
+  # clusterIP: None  # Uncomment for headless service (StatefulSet)

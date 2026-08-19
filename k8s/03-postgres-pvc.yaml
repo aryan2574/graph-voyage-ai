@@ -1,0 +1,18 @@
+# PersistentVolumeClaim: Request for storage
+# Kubernetes will provision a PersistentVolume to satisfy this claim
+# Data persists even if the Pod is deleted/restarted
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: graphvoyage
+  labels:
+    app: postgres
+spec:
+  accessModes:
+    - ReadWriteOnce  # Can be mounted by a single node in read-write mode
+  resources:
+    requests:
+      storage: 5Gi   # Request 5GB of storage
+  # storageClassName: standard  # Uncomment to specify storage class

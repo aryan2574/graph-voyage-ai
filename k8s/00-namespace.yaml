@@ -1,0 +1,10 @@
+# Namespace: Isolates GraphVoyageAI resources from other apps in the cluster
+# Think of it as a virtual cluster within your cluster
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: graphvoyage
+  labels:
+    name: graphvoyage
+    environment: local

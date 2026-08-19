@@ -1,0 +1,19 @@
+# Adminer Service
+# Exposes Adminer UI with LoadBalancer (auto localhost on Docker Desktop)
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: adminer-service
+  namespace: graphvoyage
+  labels:
+    app: adminer
+spec:
+  type: LoadBalancer  # Auto maps to localhost
+  selector:
+    app: adminer
+  ports:
+  - port: 8080        # Access on http://localhost:8080
+    targetPort: 8080
+    protocol: TCP
+    name: http

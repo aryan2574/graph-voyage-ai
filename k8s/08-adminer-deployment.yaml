@@ -1,0 +1,53 @@
+# Adminer Database Management UI
+# Optional: For inspecting PostgreSQL database
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: adminer
+  namespace: graphvoyage
+  labels:
+    app: adminer
+    tier: tools
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: adminer
+  template:
+    metadata:
+      labels:
+        app: adminer
+        tier: tools
+    spec:
+      containers:
+      - name: adminer
+        image: adminer:latest
+        imagePullPolicy: IfNotPresent
+        
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5

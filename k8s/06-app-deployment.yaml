@@ -1,0 +1,138 @@
+# GraphVoyageAI FastAPI Application Deployment
+# Can scale to multiple replicas for high availability
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: graphvoyageai-app
+  namespace: graphvoyage
+  labels:
+    app: graphvoyageai
+    tier: backend
+spec:
+  replicas: 2  # Run 2 replicas for load balancing and HA
+  
+  # Deployment strategy: How to replace old Pods with new ones
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1  # Max 1 Pod can be unavailable during update
+      maxSurge: 1        # Max 1 extra Pod during update
+  
+  selector:
+    matchLabels:
+      app: graphvoyageai
+  
+  template:
+    metadata:
+      labels:
+        app: graphvoyageai
+        tier: backend
+    spec:
+      # InitContainer: Runs before main containers, waits for database
+      initContainers:
+      - name: wait-for-postgres
+        image: postgres:16-alpine
+        command:
+        - /bin/sh
+        - -c
+        - |
+          until pg_isready -h postgres-service -p 5432 -U travel_user; do
+            echo "Waiting for PostgreSQL to be ready..."
+            sleep 2
+          done
+          echo "PostgreSQL is ready!"
+        env:
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: graphvoyageai-secrets
+              key: postgres-password
+      
+      containers:
+      - name: app
+        image: graphvoyageai:latest
+        imagePullPolicy: IfNotPresent  # Use local image if available
+        # For production with registry: imagePullPolicy: Always
+        
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        
+        # Environment variables from ConfigMap
+        envFrom:
+        - configMapRef:
+            name: graphvoyageai-config
+        
+        # Environment variables from Secret
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: graphvoyageai-secrets
+              key: database-url
+        - name: GROQ_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: graphvoyageai-secrets
+              key: groq-api-key
+        - name: AVIATIONSTACK_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: graphvoyageai-secrets
+              key: aviationstack-api-key
+        - name: TAVILY_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: graphvoyageai-secrets
+              key: tavily-api-key
+        - name: OPENWEATHER_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: graphvoyageai-secrets
+              key: openweather-api-key
+        - name: LANGSMITH_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: graphvoyageai-secrets
+              key: langsmith-api-key
+        
+        # Resource requests and limits
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        
+        # Liveness probe: Is the app alive?
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        # Readiness probe: Is the app ready to receive traffic?
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        
+        # Startup probe: For slow-starting apps
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30  # Gives 5 minutes to start (30 * 10s)

@@ -1,0 +1,22 @@
+# Pod Disruption Budget
+# Ensures at least 1 pod is always available during disruptions
+# (node drain, cluster upgrade, voluntary evictions)
+
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: graphvoyageai-pdb
+  namespace: graphvoyage
+spec:
+  minAvailable: 1  # Always keep at least 1 pod running
+  # Alternatively, use maxUnavailable: 1 to allow max 1 pod down
+  
+  selector:
+    matchLabels:
+      app: graphvoyageai  # Applies to pods with this label
+  
+  # This prevents K8s from evicting too many pods at once
+  # Useful during:
+  # - Node maintenance (kubectl drain)
+  # - Cluster upgrades
+  # - Pod evictions due to resource pressure

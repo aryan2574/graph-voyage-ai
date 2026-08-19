@@ -1,0 +1,25 @@
+# ConfigMap: Stores non-sensitive configuration data
+# Can be consumed as environment variables or mounted as files
+# Changes require Pod restart (unless using subPath mounts)
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: graphvoyageai-config
+  namespace: graphvoyage
+data:
+  # Application configuration
+  GROQ_MODEL: "openai/gpt-oss-120b"
+  DEFAULT_ORIGIN_IATA: "DAC"
+  ENVIRONMENT: "development"
+  
+  # LangSmith configuration
+  LANGSMITH_TRACING: "true"
+  LANGSMITH_ENDPOINT: "https://api.smith.langchain.com"
+  LANGSMITH_PROJECT: "graph-voyage-ai"
+  EVAL_SAMPLE_RATE: "1.0"
+  EVAL_ROLLING_WINDOW: "100"
+  
+  # Database configuration (non-sensitive parts)
+  POSTGRES_DB: "travel_db"
+  POSTGRES_USER: "travel_user"

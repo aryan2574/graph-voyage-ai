@@ -1,0 +1,29 @@
+# GraphVoyageAI Service
+# Exposes the FastAPI app to outside the cluster
+# LoadBalancer automatically maps to localhost on Docker Desktop
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: graphvoyageai-service
+  namespace: graphvoyage
+  labels:
+    app: graphvoyageai
+spec:
+  type: LoadBalancer  # Docker Desktop maps to localhost automatically!
+  # On cloud K8s (AWS/GCP/Azure), this creates a real cloud load balancer
+  
+  selector:
+    app: graphvoyageai  # Routes to Pods with this label
+  
+  ports:
+  - port: 8000          # External port (what you access)
+    targetPort: 8000    # Container port (where app listens)
+    protocol: TCP
+    name: http
+  
+  # sessionAffinity: ClientIP  # Uncomment for sticky sessions
+  
+  # Docker Desktop automatically assigns localhost
+  # Cloud providers assign an external IP (costs money!)
+  # For production, use Ingress instead (see ingress.yaml)
