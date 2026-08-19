@@ -19,7 +19,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 # Portable paths: current interpreter + weather server next to this file
 PYTHON_EXECUTABLE = sys.executable
 WEATHER_SERVER_PATH = str(
-    Path(__file__).resolve().parent / "custom_weather_mcp_server.py"
+    Path(__file__).resolve().parent / "weather_server.py"
 )
 
 GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")

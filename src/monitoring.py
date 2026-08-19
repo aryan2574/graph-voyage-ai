@@ -158,10 +158,14 @@ async def evaluate_request_async(request_data: Dict[str, Any], result: Dict[str,
                     eval_passed = %s,
                     eval_completeness_score = %s,
                     eval_safety_passed = %s
-                WHERE thread_id = %s
-                  AND was_evaluated = FALSE
-                ORDER BY created_at DESC
-                LIMIT 1
+                WHERE id = (
+                    SELECT id
+                    FROM eval_logs
+                    WHERE thread_id = %s
+                      AND was_evaluated = FALSE
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                )
             """, (
                 passed,
                 completeness_score,
