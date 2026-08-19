@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "build:local": "tsc && vite build",
-    "build:deploy": "tsc && vite build --mode production",
+    "build:local": "tsc && vite build --mode development",
+    "build:prod": "tsc && vite build --mode production",
     "preview": "vite preview",
     "type-check": "tsc --noEmit"
   },
